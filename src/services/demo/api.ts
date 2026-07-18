@@ -130,9 +130,9 @@ export const demoApi = {
   // ── Symbols & market data ──
   getSymbols: () => Promise.resolve(DEMO_SYMBOLS),
   getCandles: (symbol: string, timeframe: string, limit?: number) =>
-    Promise.resolve(getHistory(symbol, timeframe, limit)),
-  getCandlesWithMeta: (symbol: string, timeframe: string, limit?: number) =>
-    Promise.resolve(candlesMeta(getHistory(symbol, timeframe, limit))),
+    getHistory(symbol, timeframe, limit),
+  getCandlesWithMeta: async (symbol: string, timeframe: string, limit?: number) =>
+    candlesMeta(await getHistory(symbol, timeframe, limit)),
   getTick: (symbol: string) => {
     const price = engine.getLastPrice(symbol);
     return Promise.resolve({ symbol, bid: price, ask: price, timestamp: Date.now() });
