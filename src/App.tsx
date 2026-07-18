@@ -2,24 +2,24 @@ import { useEffect, useState } from "react";
 import { TradingPage } from "./pages/TradingPage.tsx";
 import { DemoOnboarding } from "./components/DemoOnboarding.tsx";
 import { LoginScreen } from "./components/LoginScreen.tsx";
+import { Logo } from "./components/Logo.tsx";
 import { useAuthStore, useTradingStore } from "./services/store.tsx";
 import * as engine from "./services/demo/engine.ts";
-import { isAuthConfigured, verifySession } from "./services/supabaseAuth.ts";
+import { getUser, isAuthConfigured, verifySession } from "./services/supabaseAuth.ts";
 
 /**
- * OpenCharts entry point.
+ * Liquidity Hunter — trading terminal entry point.
  *
- * Flow: (1) auth gate — user logs in with their LiquidityHunter email/password
- * (shared Supabase). (2) On first visit, onboarding collects starting balance &
- * leverage. (3) The persisted demo account is restored on every load.
- *
- * If auth env vars aren't configured, the login gate is skipped so the terminal
- * still works (fail-open for local/dev, never a hard lock-out).
+ * Flow: (1) login gate (shared LiquidityHunter/Supabase email+password).
+ * (2) The engine is scoped to THIS user, so their funds/positions are isolated.
+ * (3) First-time users pick a starting balance & leverage. (4) The account is
+ * restored on every load.
  */
 function Loading() {
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-[#0a0a0a] text-neutral-400">
-      Loading…
+    <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-[#0a0a0a]">
+      <Logo size="lg" showTagline />
+      <span className="text-xs text-neutral-500">Loading…</span>
     </div>
   );
 }
@@ -56,7 +56,7 @@ export function App() {
     };
   }, []);
 
-  // 2) Boot the demo terminal once authenticated.
+  // 2) Boot the terminal once authenticated — scoped to this user's account.
   useEffect(() => {
     if (!authed) return;
     let cancelled = false;
@@ -64,6 +64,9 @@ export function App() {
       await demoLogin();
       localStorage.setItem("is_demo", "false");
       useAuthStore.setState({ isDemo: false });
+
+      // Isolate this user's funds / positions / history.
+      engine.setUser(getUser()?.id ?? null);
 
       if (!engine.isInitialized()) {
         if (!cancelled) {
