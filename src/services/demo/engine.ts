@@ -3,38 +3,114 @@ import { publish } from "./bus.ts";
 import { getDemoSymbol } from "./instruments.ts";
 
 /**
- * In-browser paper-trading engine. The single source of truth for the demo
+ * In-browser paper-trading engine — the single source of truth for the demo
  * account, positions and orders. Market orders fill instantly at the latest
- * replayed price; positions are marked-to-market on every tick. State is
- * ephemeral (memory only) — a refresh starts a fresh demo session.
+ * price; positions are marked-to-market on every tick.
+ *
+ * State is PERSISTED to localStorage, so a page refresh restores the account,
+ * open positions, orders and history. Starting balance and leverage are chosen
+ * by the user at onboarding (see initDemoAccount).
  */
 
-const STARTING_BALANCE = 100_000;
+const STORAGE_KEY = "oc_demo_state_v1";
+const DEFAULT_BALANCE = 100_000;
 const DEFAULT_LEVERAGE = 100;
 
-const account: Account = {
-  id: crypto.randomUUID(),
-  userId: "demo-user",
-  templateId: "demo",
-  label: "Demo Account",
-  status: "ACTIVE",
-  balance: STARTING_BALANCE,
-  equity: STARTING_BALANCE,
-  margin: 0,
-  freeMargin: STARTING_BALANCE,
-  phase: "LIVE",
-  startDate: new Date().toISOString(),
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  isHftMode: false,
-  template: { name: "Demo Account", startingBalance: STARTING_BALANCE, instrumentType: "CRYPTO" },
-};
+function makeAccount(balance: number): Account {
+  const now = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    userId: "demo-user",
+    templateId: "demo",
+    label: "Demo Account",
+    status: "ACTIVE",
+    balance,
+    equity: balance,
+    margin: 0,
+    freeMargin: balance,
+    phase: "LIVE",
+    startDate: now,
+    createdAt: now,
+    updatedAt: now,
+    isHftMode: false,
+    template: { name: "Demo Account", startingBalance: balance, instrumentType: "CRYPTO" },
+  };
+}
 
+let account: Account = makeAccount(DEFAULT_BALANCE);
+let leverage = DEFAULT_LEVERAGE;
 const positions: Position[] = [];
 const orders: Order[] = [];
 const closed: ClosedPosition[] = [];
 const fills: Fill[] = [];
 const lastPrice = new Map<string, number>();
+
+// ── Persistence ───────────────────────────────────────────────────────────
+
+function persist(): void {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ account, leverage, positions, orders, closed, fills }),
+    );
+  } catch {
+    /* storage full / unavailable — non-fatal */
+  }
+}
+
+function load(): boolean {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    if (!s || !s.account) return false;
+    account = s.account;
+    leverage = s.leverage ?? DEFAULT_LEVERAGE;
+    positions.splice(0, positions.length, ...(s.positions ?? []));
+    orders.splice(0, orders.length, ...(s.orders ?? []));
+    closed.splice(0, closed.length, ...(s.closed ?? []));
+    fills.splice(0, fills.length, ...(s.fills ?? []));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+let initialized = load();
+
+/** True once a user has chosen a starting balance (i.e. onboarding is done). */
+export function isInitialized(): boolean {
+  return initialized;
+}
+
+/** Create a fresh demo account with the chosen balance & leverage, and save it. */
+export function initDemoAccount(balance: number, lev: number): void {
+  account = makeAccount(balance);
+  leverage = lev > 0 ? lev : DEFAULT_LEVERAGE;
+  positions.length = 0;
+  orders.length = 0;
+  closed.length = 0;
+  fills.length = 0;
+  lastPrice.clear();
+  initialized = true;
+  persist();
+}
+
+/** Wipe the saved demo account (used by a "reset account" action). */
+export function resetDemoAccount(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* no-op */
+  }
+  initialized = false;
+}
+
+export function getLeverage(): number {
+  return leverage;
+}
+
+// ── Reads ───────────────────────────────────────────────────────────────
 
 export function getAccount(): Account {
   return { ...account };
@@ -107,7 +183,7 @@ function openPosition(symbol: string, side: string, qty: number, price: number, 
     entryPrice: price,
     currentPrice: price,
     unrealizedPnl: 0,
-    margin: notional(symbol, qty, price) / DEFAULT_LEVERAGE,
+    margin: notional(symbol, qty, price) / leverage,
     contractSize: getDemoSymbol(symbol)?.contractSize ?? 1,
     openedAt: new Date().toISOString(),
     takeProfit: tp ?? null,
@@ -162,6 +238,7 @@ export function placeOrder(input: PlaceOrderArgs): Order {
   openPosition(input.symbol, input.side, input.quantity, price, input.takeProfit, input.stopLoss);
   recomputeEquity();
   emitEquity();
+  persist();
   return order;
 }
 
@@ -214,6 +291,7 @@ export function closePosition(positionId: string, quantity?: number): { success:
   }
   recomputeEquity();
   emitEquity();
+  persist();
   return { success: true };
 }
 
@@ -238,6 +316,7 @@ export function modifyPosition(
     quantity: pos.quantity,
     averagePrice: pos.entryPrice,
   });
+  persist();
   return { ...pos };
 }
 
@@ -245,6 +324,7 @@ export function cancelOrder(orderId: string): { success: boolean } {
   const idx = orders.findIndex((o) => o.id === orderId);
   if (idx >= 0) orders.splice(idx, 1);
   publish("orders", { eventType: "OrderCanceled", accountId: account.id, orderId });
+  persist();
   return { success: true };
 }
 
@@ -254,7 +334,7 @@ function checkStops(pos: Position, price: number): boolean {
   return hitTp || hitSl;
 }
 
-/** Called by the feed on every replayed tick: marks positions, fires SL/TP. */
+/** Called by the feed on every tick: marks positions, fires SL/TP. */
 export function mark(symbol: string, price: number): void {
   lastPrice.set(symbol, price);
   const affected = positions.filter((p) => p.symbolName === symbol);
