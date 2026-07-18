@@ -236,18 +236,81 @@ export type PlaceOrderArgs = {
   stopLoss?: number;
 };
 
-/** Market orders fill instantly at the latest price; an open position is created. */
+function makeWorkingOrder(input: PlaceOrderArgs): Order {
+  const now = new Date().toISOString();
+  const type = (input.type as Order["type"]) ?? "LIMIT";
+  return {
+    id: crypto.randomUUID(),
+    accountId: account.id,
+    symbolName: input.symbol,
+    side: input.side === "BUY" ? "BUY" : "SELL",
+    type,
+    quantity: input.quantity,
+    price: type === "LIMIT" ? (input.price ?? null) : null,
+    stopPrice: type === "STOP" ? (input.stopPrice ?? null) : null,
+    takeProfit: input.takeProfit ?? null,
+    stopLoss: input.stopLoss ?? null,
+    status: "PENDING",
+    filledQuantity: 0,
+    avgFillPrice: null,
+    comment: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+/**
+ * MARKET orders fill instantly at the current price and open a position.
+ * LIMIT/STOP orders rest as PENDING and only fill (open a position) once the
+ * live price reaches their trigger — see tryFillPending(), called on every tick.
+ */
 export function placeOrder(input: PlaceOrderArgs): Order {
-  const price = input.price ?? lastPrice.get(input.symbol) ?? 0;
-  const order = makeFilledOrder(input, price);
+  const type = (input.type ?? "MARKET").toString().toUpperCase();
+
+  if (type === "MARKET") {
+    const price = input.price ?? lastPrice.get(input.symbol) ?? 0;
+    const order = makeFilledOrder(input, price);
+    orders.unshift(order);
+    publish("orders", { eventType: "OrderPlaced", accountId: account.id, orderId: order.id, _entity: { ...order } });
+    publish("orders", { eventType: "OrderFilled", accountId: account.id, orderId: order.id, _entity: { ...order } });
+    openPosition(input.symbol, input.side, input.quantity, price, input.takeProfit, input.stopLoss);
+    recomputeEquity();
+    emitEquity();
+    persist();
+    return order;
+  }
+
+  // LIMIT / STOP — rest as a pending working order; no position, no P/L yet.
+  const order = makeWorkingOrder(input);
   orders.unshift(order);
   publish("orders", { eventType: "OrderPlaced", accountId: account.id, orderId: order.id, _entity: { ...order } });
-  publish("orders", { eventType: "OrderFilled", accountId: account.id, orderId: order.id, _entity: { ...order } });
-  openPosition(input.symbol, input.side, input.quantity, price, input.takeProfit, input.stopLoss);
-  recomputeEquity();
-  emitEquity();
   persist();
   return order;
+}
+
+/** Fill any PENDING limit/stop orders for a symbol once price reaches the trigger. */
+function tryFillPending(symbol: string, price: number): boolean {
+  let filledAny = false;
+  for (const o of orders) {
+    if (o.symbolName !== symbol || o.status !== "PENDING") continue;
+    const trigger = o.type === "LIMIT" ? o.price : o.stopPrice;
+    if (trigger == null) continue;
+    let hit = false;
+    if (o.type === "LIMIT") {
+      hit = o.side === "BUY" ? price <= trigger : price >= trigger;
+    } else if (o.type === "STOP") {
+      hit = o.side === "BUY" ? price >= trigger : price <= trigger;
+    }
+    if (!hit) continue;
+    o.status = "FILLED";
+    o.filledQuantity = o.quantity;
+    o.avgFillPrice = trigger;
+    o.updatedAt = new Date().toISOString();
+    publish("orders", { eventType: "OrderFilled", accountId: account.id, orderId: o.id, _entity: { ...o } });
+    openPosition(o.symbolName, o.side, o.quantity, trigger, o.takeProfit ?? undefined, o.stopLoss ?? undefined);
+    filledAny = true;
+  }
+  return filledAny;
 }
 
 function recordClose(pos: Position, qty: number, exitPrice: number, realized: number): void {
@@ -345,8 +408,9 @@ function checkStops(pos: Position, price: number): boolean {
 /** Called by the feed on every tick: marks positions, fires SL/TP. */
 export function mark(symbol: string, price: number): void {
   lastPrice.set(symbol, price);
+  const filled = tryFillPending(symbol, price);
   const affected = positions.filter((p) => p.symbolName === symbol);
-  if (affected.length === 0) return;
+  if (affected.length === 0 && !filled) return;
   for (const pos of affected) {
     if (checkStops(pos, price)) {
       closePosition(pos.id);
@@ -365,4 +429,5 @@ export function mark(symbol: string, price: number): void {
   }
   recomputeEquity();
   emitEquity();
+  if (filled) persist();
 }
