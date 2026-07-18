@@ -17,6 +17,7 @@ import { DisconnectedTradingBanner } from "../../components/ConnectionIndicator.
 import type { PlaceOrderInput } from "../../services/schemas.ts";
 import { toast } from "../../services/toast.ts";
 import { formatCurrency, formatNumber, cn } from "../../lib/utils.ts";
+import { LeverageSelect } from "./LeverageSelect.tsx";
 
 type ConfirmableOrder = PlaceOrderInput & { _submit: () => Promise<unknown> };
 
@@ -234,6 +235,9 @@ export function OrderPanel({
             SELL {tick ? formatNumber(tick.bid, 5) : ""}
           </Button>
         </div>
+
+        {/* Leverage */}
+        <LeverageSelect />
 
         {/* Order Type */}
         <div>
