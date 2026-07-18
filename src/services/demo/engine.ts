@@ -12,7 +12,12 @@ import { getDemoSymbol } from "./instruments.ts";
  * by the user at onboarding (see initDemoAccount).
  */
 
-const STORAGE_KEY = "oc_demo_state_v1";
+let currentUserId: string | null = null;
+
+/** Per-user storage key so each logged-in user gets an isolated account. */
+function storageKey(): string {
+  return `oc_demo_state_v1_${currentUserId ?? "anon"}`;
+}
 const DEFAULT_BALANCE = 100_000;
 const DEFAULT_LEVERAGE = 100;
 
@@ -22,7 +27,7 @@ function makeAccount(balance: number): Account {
     id: crypto.randomUUID(),
     userId: "demo-user",
     templateId: "demo",
-    label: "Demo Account",
+    label: "Trading Account",
     status: "ACTIVE",
     balance,
     equity: balance,
@@ -33,7 +38,7 @@ function makeAccount(balance: number): Account {
     createdAt: now,
     updatedAt: now,
     isHftMode: false,
-    template: { name: "Demo Account", startingBalance: balance, instrumentType: "CRYPTO" },
+    template: { name: "Trading Account", startingBalance: balance, instrumentType: "CRYPTO" },
   };
 }
 
@@ -50,7 +55,7 @@ const lastPrice = new Map<string, number>();
 function persist(): void {
   try {
     localStorage.setItem(
-      STORAGE_KEY,
+      storageKey(),
       JSON.stringify({ account, leverage, positions, orders, closed, fills }),
     );
   } catch {
@@ -60,7 +65,7 @@ function persist(): void {
 
 function load(): boolean {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     if (!raw) return false;
     const s = JSON.parse(raw);
     if (!s || !s.account) return false;
@@ -83,6 +88,23 @@ export function isInitialized(): boolean {
   return initialized;
 }
 
+/**
+ * Switch the engine to a specific logged-in user. Loads THAT user's saved
+ * account (or none, triggering onboarding). This keeps each user's funds,
+ * positions and history fully separate — a new user starts fresh.
+ */
+export function setUser(userId: string | null): void {
+  currentUserId = userId ?? null;
+  positions.length = 0;
+  orders.length = 0;
+  closed.length = 0;
+  fills.length = 0;
+  lastPrice.clear();
+  account = makeAccount(DEFAULT_BALANCE);
+  leverage = DEFAULT_LEVERAGE;
+  initialized = load();
+}
+
 /** Create a fresh demo account with the chosen balance & leverage, and save it. */
 export function initDemoAccount(balance: number, lev: number): void {
   account = makeAccount(balance);
@@ -99,7 +121,7 @@ export function initDemoAccount(balance: number, lev: number): void {
 /** Wipe the saved demo account (used by a "reset account" action). */
 export function resetDemoAccount(): void {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(storageKey());
   } catch {
     /* no-op */
   }
