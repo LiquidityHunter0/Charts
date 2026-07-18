@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { signIn } from "../services/supabaseAuth.ts";
+import { Logo } from "./Logo.tsx";
 
 /**
  * Login gate. Users sign in with their LiquidityHunter email & password
@@ -32,9 +33,12 @@ export function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-[#0a0a0a] px-4 text-neutral-200">
       <div className="w-full max-w-sm rounded-2xl border border-neutral-800 bg-[#111] p-8 shadow-2xl">
-        <h1 className="mb-1 text-2xl font-semibold text-white">Log in</h1>
+        <div className="mb-6 flex justify-center">
+          <Logo size="lg" showTagline />
+        </div>
+        <h1 className="mb-1 text-xl font-semibold text-white">Log in</h1>
         <p className="mb-6 text-sm text-neutral-400">
-          Use your LiquidityHunter email and password to start trading.
+          Use your Liquidity Hunter email and password to start trading.
         </p>
 
         <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-neutral-500">
