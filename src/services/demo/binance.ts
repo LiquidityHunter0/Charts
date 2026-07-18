@@ -5,11 +5,11 @@ import { DEMO_SYMBOLS } from "./instruments.ts";
  * Live market data from Binance's public (unauthenticated) endpoints.
  *
  *  - REST  https://data-api.binance.vision  -> historical OHLC klines
- *  - WS    wss://data-stream.binance.vision -> real-time trade ticks
+ *  - WS    wss://data-stream.binance.vision -> real-time best bid/ask stream
  *
- * No API key is required for public market data. The paper-trading engine and
- * chart consume the same MarketTick / Candle contracts as before, so nothing
- * downstream had to change — only the *source* of the data (real & live now).
+ * No API key is required. The best bid/ask (@bookTicker) stream updates on
+ * every top-of-book change — many times per second for liquid pairs — giving a
+ * genuine fast "live" feel, and provides the real bid/ask (not synthetic).
  */
 
 const REST_URL = "https://data-api.binance.vision/api/v3/klines";
@@ -63,9 +63,9 @@ export async function fetchKlines(
   }
 }
 
-// ── Live trade-tick stream (one combined socket for all demo symbols) ──────
+// ── Live best bid/ask stream (one combined socket for all demo symbols) ────
 
-type TickHandler = (symbol: string, price: number) => void;
+type TickHandler = (symbol: string, bid: number, ask: number) => void;
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -76,7 +76,7 @@ export function startTickStream(onTick: TickHandler): void {
   stopTickStream(true);
 
   const streams = DEMO_SYMBOLS.map(
-    (s) => `${toBinance(s.name).toLowerCase()}@trade`,
+    (s) => `${toBinance(s.name).toLowerCase()}@bookTicker`,
   ).join("/");
 
   const connect = () => {
@@ -87,8 +87,13 @@ export function startTickStream(onTick: TickHandler): void {
       try {
         const msg = JSON.parse(ev.data as string);
         const d = msg?.data;
-        if (d && d.e === "trade" && d.s && d.p) {
-          onTick(fromBinance(d.s), Number(d.p));
+        // bookTicker payload: { s: symbol, b: bestBid, a: bestAsk, ... }
+        if (d && d.s && d.b && d.a) {
+          const bid = Number(d.b);
+          const ask = Number(d.a);
+          if (Number.isFinite(bid) && Number.isFinite(ask)) {
+            onTick(fromBinance(d.s), bid, ask);
+          }
         }
       } catch {
         /* ignore malformed frames */
