@@ -2,6 +2,7 @@
 
 # 📈 OpenCharts
 
+
 **An open-source trading terminal that runs entirely in your browser — no backend, no signup, no API keys.**
 
 Advanced charting · full drawing-tool suite · watchlist · depth-of-market · order panel · built-in paper-trading engine, seeded with **real** market history.
