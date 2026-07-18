@@ -110,6 +110,14 @@ export function getLeverage(): number {
   return leverage;
 }
 
+/** Change the account leverage (used for margin on new positions) and save it. */
+export function setLeverage(lev: number): void {
+  if (lev > 0) {
+    leverage = lev;
+    persist();
+  }
+}
+
 // ── Reads ───────────────────────────────────────────────────────────────
 
 export function getAccount(): Account {
