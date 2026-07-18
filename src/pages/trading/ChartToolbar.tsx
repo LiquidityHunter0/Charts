@@ -52,6 +52,8 @@ import { ChartTemplatesMenu } from "./ChartTemplatesMenu.tsx";
 import { ReplayHUD } from "./ReplayHUD.tsx";
 import { getPipDigits } from "./utils.ts";
 
+import { WalletBadge } from "../../components/WalletBadge.tsx";
+
 export interface ChartToolbarProps {
   selectedSymbol: string;
   symbols: Array<{
@@ -388,6 +390,8 @@ export function ChartToolbar({
       }
 
       <div className="flex-1 hidden md:block" />
+
+      <WalletBadge />
 
       {/* Right Panel Toggles */}
       <div className="hidden md:flex items-center gap-0.5">
