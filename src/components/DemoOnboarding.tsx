@@ -1,5 +1,6 @@
 import { useState } from "react";
 import * as engine from "../services/demo/engine.ts";
+import { Logo } from "./Logo.tsx";
 
 /**
  * First-run onboarding for the demo terminal. A new user picks a starting
@@ -26,9 +27,12 @@ export function DemoOnboarding({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-[#0a0a0a] px-4 text-neutral-200">
       <div className="w-full max-w-md rounded-2xl border border-neutral-800 bg-[#111] p-8 shadow-2xl">
-        <h1 className="mb-1 text-2xl font-semibold text-white">Welcome to your Demo Account</h1>
+        <div className="mb-5 flex justify-center">
+          <Logo size="lg" />
+        </div>
+        <h1 className="mb-1 text-2xl font-semibold text-white">Set up your account</h1>
         <p className="mb-6 text-sm text-neutral-400">
-          Pick a starting balance and leverage to begin paper trading with live market prices.
+          Pick a starting balance and leverage to begin trading with live market prices.
         </p>
 
         <div className="mb-6">
