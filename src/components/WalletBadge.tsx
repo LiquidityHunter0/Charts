@@ -35,12 +35,12 @@ export function WalletBadge() {
     <div className="flex items-center gap-1.5 shrink-0">
       {account && (
         <div
-          className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-md bg-secondary/60 border border-border"
+          className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/60 border border-border"
           title="Account funds (equity) · open P/L"
         >
-          <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs font-semibold tabular-nums">{fmtUsd(equity)}</span>
-          <span className={`text-[11px] tabular-nums ${pnlColor}`}>
+          <Wallet className="h-4 w-4 text-emerald-500" />
+          <span className="text-sm font-semibold tabular-nums">{fmtUsd(equity)}</span>
+          <span className={`text-xs font-medium tabular-nums ${pnlColor}`}>
             {pnl >= 0 ? "+" : ""}
             {fmtUsd(pnl)}
           </span>
@@ -49,9 +49,9 @@ export function WalletBadge() {
       <button
         onClick={logout}
         title="Log out"
-        className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-secondary/40 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary/40 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
       >
-        <LogOut className="h-3.5 w-3.5" />
+        <LogOut className="h-4 w-4" />
       </button>
     </div>
   );
