@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { TrendingUp, Clock, History, Globe, Newspaper, Bot } from "lucide-react";
+import { TrendingUp, Clock, History, Globe, Newspaper, Bot, Share2 } from "lucide-react";
 import { useAuthStore } from "../../services/store.tsx";
 import { useTradingStore } from "../../services/store.tsx";
 import {
@@ -23,6 +23,8 @@ import { formatCurrency, formatNumber, formatDate, cn, pnlClass } from "../../li
 import { MOCK_EVENTS, MOCK_NEWS } from "./constants.ts";
 import { PositionsTable } from "./PositionsTable.tsx";
 import { OrdersTable } from "./OrdersTable.tsx";
+import { ShareCard } from "../../components/ShareCard.tsx";
+import * as engine from "../../services/demo/engine.ts";
 import { computeLivePnl, computeLivePrice } from "../../lib/livePnl.ts";
 
 type TradingActionError = {
@@ -301,6 +303,7 @@ export function BottomPanel({
 // ── Trade History Table ──────────────────────────────────────
 function TradeHistoryTable({ accountId }: { accountId: string | null }) {
   const [page, setPage] = useState(1);
+  const [shareTrade, setShareTrade] = useState<ClosedPosition | null>(null);
   const { data: closedData, isLoading } = useClosedPositions(accountId, page);
   const trades: ClosedPosition[] = closedData?.data || [];
   const totalPages = closedData?.totalPages || 1;
@@ -349,6 +352,7 @@ function TradeHistoryTable({ accountId }: { accountId: string | null }) {
             <th>Commission</th>
             <th>Gross P&L</th>
             <th>Net P&L</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -380,11 +384,34 @@ function TradeHistoryTable({ accountId }: { accountId: string | null }) {
                 <td className={cn("font-mono font-semibold", pnlClass(net))}>
                   {`${net >= 0 ? "+" : ""}${net.toFixed(2)}`}
                 </td>
+                <td>
+                  <button
+                    onClick={() => setShareTrade(t)}
+                    className="px-1.5 py-0.5 text-[10px] rounded bg-accent/20 text-accent hover:bg-accent/30"
+                    title="Share P/L"
+                  >
+                    <Share2 className="h-2.5 w-2.5" />
+                  </button>
+                </td>
               </tr>
             );
           })}
         </tbody>
       </table>
+      {shareTrade && (
+        <ShareCard
+          trade={{
+            symbolName: shareTrade.symbolName ?? "",
+            side: shareTrade.side ?? "LONG",
+            entryPrice: shareTrade.entryPrice ?? 0,
+            currentPrice: shareTrade.exitPrice ?? shareTrade.entryPrice ?? 0,
+            pnl: shareTrade.realizedPnl ?? 0,
+            leverage: engine.getLeverage(),
+            closed: true,
+          }}
+          onClose={() => setShareTrade(null)}
+        />
+      )}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 py-1 border-t border-border text-[10px]">
           <button
