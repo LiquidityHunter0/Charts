@@ -1,4 +1,5 @@
 import type { Position } from "../services/schemas";
+import { getDemoSymbol } from "../services/demo/instruments.ts";
 
 export interface LiveTick {
   bid: number;
@@ -6,18 +7,20 @@ export interface LiveTick {
   timestamp: number;
 }
 
-// Linear scaling: server snapshot (currentPrice, unrealizedPnl) tells us
-// PnL-per-price-unit including contract size, side and FX conversion.
-// We multiply by the live price delta to get instantaneous PnL between
-// REST polls without re-deriving contract math on the client.
+/**
+ * Live P/L for a position at the current tick — same formula as the engine
+ * (price move × quantity × contract size × direction). LONG marks on the bid,
+ * SHORT on the ask. This is the real dollar P/L; % ROE is P/L ÷ margin.
+ */
 export function computeLivePnl(p: Position, tick?: LiveTick): number {
-  if (!tick) return p.unrealizedPnl;
-  const livePrice = p.side === "LONG" ? tick.bid : tick.ask;
-  const snapPrice = p.currentPrice ?? p.entryPrice;
-  const snapDelta = snapPrice - p.entryPrice;
-  if (Math.abs(snapDelta) < 1e-12) return p.unrealizedPnl;
-  const perPriceUnit = p.unrealizedPnl / snapDelta;
-  return perPriceUnit * (livePrice - p.entryPrice);
+  const livePrice = tick
+    ? p.side === "LONG"
+      ? tick.bid
+      : tick.ask
+    : p.currentPrice ?? p.entryPrice;
+  const contractSize = getDemoSymbol(p.symbolName)?.contractSize ?? 1;
+  const dir = p.side === "LONG" ? 1 : -1;
+  return (livePrice - p.entryPrice) * p.quantity * contractSize * dir;
 }
 
 export function computeLivePrice(p: Position, tick?: LiveTick): number {
