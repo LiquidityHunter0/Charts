@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { X, Scissors } from "lucide-react";
+import { X, Scissors, Share2 } from "lucide-react";
 import { formatNumber, formatCurrency, formatDate, cn, pnlClass } from "../../lib/utils.ts";
+import { ShareCard } from "../../components/ShareCard.tsx";
+import * as engine from "../../services/demo/engine.ts";
 
 interface PositionRow {
   id: string;
@@ -30,6 +32,7 @@ export function PositionsTable({
 }) {
   const [partialCloseId, setPartialCloseId] = useState<string | null>(null);
   const [partialQty, setPartialQty] = useState("");
+  const [sharePos, setSharePos] = useState<PositionRow | null>(null);
 
   if (positions.length === 0) {
     return (
@@ -48,6 +51,7 @@ export function PositionsTable({
   };
 
   return (
+    <>
     <table className="w-full text-[11px]">
       <thead className="sticky top-0 bg-card z-10">
         <tr>
@@ -165,6 +169,16 @@ export function PositionsTable({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      setSharePos(p);
+                    }}
+                    className="px-1.5 py-0.5 text-[10px] rounded bg-accent/20 text-accent hover:bg-accent/30 flex items-center gap-0.5"
+                    title="Share P/L"
+                  >
+                    <Share2 className="h-2.5 w-2.5" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onClose(p.id);
                     }}
                     className="px-1.5 py-0.5 text-[10px] rounded bg-destructive/20 text-destructive hover:bg-destructive/30"
@@ -178,5 +192,19 @@ export function PositionsTable({
         ))}
       </tbody>
     </table>
+    {sharePos && (
+      <ShareCard
+        trade={{
+          symbolName: sharePos.symbolName,
+          side: sharePos.side,
+          entryPrice: sharePos.entryPrice,
+          currentPrice: sharePos.currentPrice ?? sharePos.entryPrice,
+          pnl: sharePos.unrealizedPnl,
+          leverage: engine.getLeverage(),
+        }}
+        onClose={() => setSharePos(null)}
+      />
+    )}
+    </>
   );
 }
