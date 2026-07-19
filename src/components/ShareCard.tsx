@@ -52,7 +52,7 @@ export function ShareCard({ trade, onClose }: { trade: ShareTrade; onClose: () =
     const canvas = canvasRef.current;
     if (!canvas) return;
     const W = 600;
-    const H = 640;
+    const H = 680;
     const scale = 2;
     canvas.width = W * scale;
     canvas.height = H * scale;
@@ -75,17 +75,17 @@ export function ShareCard({ trade, onClose }: { trade: ShareTrade; onClose: () =
 
     // ── brand: wolf logo, name, tagline ──
     if (logo) {
-      ctx.drawImage(logo, PAD, 28, 66, 66);
+      ctx.drawImage(logo, PAD, 30, 104, 104);
     }
     ctx.font = "700 24px Inter, system-ui, sans-serif";
     ctx.fillStyle = "#ffffff";
-    ctx.fillText("Liquidity", PAD, 120);
+    ctx.fillText("Liquidity", PAD, 164);
     const lqw = ctx.measureText("Liquidity").width;
     ctx.fillStyle = GREEN;
-    ctx.fillText("Hunter", PAD + lqw, 120);
-    ctx.font = "italic 500 15px Inter, system-ui, sans-serif";
+    ctx.fillText("Hunter", PAD + lqw, 164);
+    ctx.font = "500 15px Inter, system-ui, sans-serif";
     ctx.fillStyle = "#9ca3af";
-    ctx.fillText("We don't chase we hunt", PAD, 146);
+    ctx.fillText("We don't chase we hunt", PAD, 190);
 
     // nickname pill (top-right)
     if (showNickname && nickname) {
@@ -102,7 +102,7 @@ export function ShareCard({ trade, onClose }: { trade: ShareTrade; onClose: () =
       ctx.textAlign = "left";
     }
 
-    let y = 214;
+    let y = 246;
 
     // ── symbol · Perpetual (measured with the big font so it never overlaps) ──
     ctx.font = "700 34px Inter, system-ui, sans-serif";
