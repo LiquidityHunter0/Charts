@@ -22,10 +22,7 @@ export function ShareCard({ trade, onClose }: { trade: ShareTrade; onClose: () =
   const [showPosition, setShowPosition] = useState(true);
   const [showNickname, setShowNickname] = useState(true);
   const [nickname, setNickname] = useState("");
-
-  useEffect(() => {
-    getNickname().then(setNickname);
-  }, []);
+  const [logo, setLogo] = useState<HTMLImageElement | null>(null);
 
   const side = trade.side === "LONG" || trade.side === "BUY" ? "LONG" : "SHORT";
   const lev = trade.leverage && trade.leverage > 0 ? trade.leverage : 1;
@@ -35,6 +32,18 @@ export function ShareCard({ trade, onClose }: { trade: ShareTrade; onClose: () =
   const up = trade.pnl >= 0;
   const color = up ? GREEN : RED;
 
+  useEffect(() => {
+    getNickname().then(setNickname);
+  }, []);
+
+  // Load the hooded-wolf logo — green eyes for profit, red eyes for loss.
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => setLogo(img);
+    img.onerror = () => setLogo(null);
+    img.src = up ? "/hunter-green.png" : "/hunter-red.png";
+  }, [up]);
+
   function fmtPrice(n: number) {
     return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
   }
@@ -43,7 +52,7 @@ export function ShareCard({ trade, onClose }: { trade: ShareTrade; onClose: () =
     const canvas = canvasRef.current;
     if (!canvas) return;
     const W = 600;
-    const H = 720;
+    const H = 640;
     const scale = 2;
     canvas.width = W * scale;
     canvas.height = H * scale;
@@ -51,7 +60,6 @@ export function ShareCard({ trade, onClose }: { trade: ShareTrade; onClose: () =
     if (!ctx) return;
     ctx.scale(scale, scale);
 
-    // background
     const grad = ctx.createLinearGradient(0, 0, 0, H);
     grad.addColorStop(0, "#111214");
     grad.addColorStop(1, "#0a0a0b");
@@ -62,85 +70,73 @@ export function ShareCard({ trade, onClose }: { trade: ShareTrade; onClose: () =
     ctx.strokeRect(1, 1, W - 2, H - 2);
 
     const PAD = 44;
-
-    // ── header: logo mark + wordmark ──
-    const cx = PAD + 14;
-    const cy = 60;
-    ctx.strokeStyle = GREEN;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 15, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - 22); ctx.lineTo(cx, cy - 17);
-    ctx.moveTo(cx, cy + 17); ctx.lineTo(cx, cy + 22);
-    ctx.moveTo(cx - 22, cy); ctx.lineTo(cx - 17, cy);
-    ctx.moveTo(cx + 17, cy); ctx.lineTo(cx + 22, cy);
-    ctx.stroke();
-    ctx.fillStyle = RED;
-    ctx.fillRect(cx - 5, cy - 2, 3, 8);
-    ctx.fillStyle = GREEN;
-    ctx.fillRect(cx + 2, cy - 6, 3, 10);
-
+    ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.font = "700 22px Inter, system-ui, sans-serif";
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText("Liquidity", PAD + 40, cy - 1);
-    const lw = ctx.measureText("Liquidity").width;
-    ctx.fillStyle = GREEN;
-    ctx.fillText("Hunter", PAD + 40 + lw, cy - 1);
 
-    // nickname pill (right)
+    // ── brand: wolf logo, name, tagline ──
+    if (logo) {
+      ctx.drawImage(logo, PAD, 28, 66, 66);
+    }
+    ctx.font = "700 24px Inter, system-ui, sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText("Liquidity", PAD, 120);
+    const lqw = ctx.measureText("Liquidity").width;
+    ctx.fillStyle = GREEN;
+    ctx.fillText("Hunter", PAD + lqw, 120);
+    ctx.font = "italic 500 15px Inter, system-ui, sans-serif";
+    ctx.fillStyle = "#9ca3af";
+    ctx.fillText("We don't chase we hunt", PAD, 146);
+
+    // nickname pill (top-right)
     if (showNickname && nickname) {
       ctx.font = "600 15px Inter, system-ui, sans-serif";
       const tw = ctx.measureText(nickname).width;
       const pillW = tw + 28;
       const pillX = W - PAD - pillW;
       ctx.fillStyle = "#1c1d21";
-      roundRect(ctx, pillX, cy - 15, pillW, 30, 15);
+      roundRect(ctx, pillX, 46, pillW, 32, 16);
       ctx.fill();
       ctx.fillStyle = "#d4d4d8";
       ctx.textAlign = "center";
-      ctx.fillText(nickname, pillX + pillW / 2, cy);
+      ctx.fillText(nickname, pillX + pillW / 2, 62);
       ctx.textAlign = "left";
     }
 
-    let y = 150;
+    let y = 214;
 
-    // ── symbol ──
+    // ── symbol · Perpetual (measured with the big font so it never overlaps) ──
     ctx.font = "700 34px Inter, system-ui, sans-serif";
     ctx.fillStyle = "#ffffff";
     ctx.fillText(trade.symbolName, PAD, y);
+    const symW = ctx.measureText(trade.symbolName).width;
     ctx.font = "500 18px Inter, system-ui, sans-serif";
     ctx.fillStyle = MUTED;
-    ctx.fillText("Perpetual", PAD + ctx.measureText(trade.symbolName).width + 14, y + 2);
-    y += 44;
+    ctx.fillText("Perpetual", PAD + symW + 18, y + 3);
+    y += 46;
 
-    // ── side · leverage ──
+    // ── side | leverage ──
     ctx.font = "600 20px Inter, system-ui, sans-serif";
     ctx.fillStyle = side === "LONG" ? GREEN : RED;
-    ctx.fillText(`${side}`, PAD, y);
+    ctx.fillText(side, PAD, y);
     const sw = ctx.measureText(side).width;
     ctx.fillStyle = MUTED;
     ctx.fillText(`  |  ${lev}x`, PAD + sw, y);
-    y += 60;
+    y += 58;
 
-    // ── big PNL % ──
+    // ── big PNL % + amount ──
     if (showPnl) {
-      ctx.font = "800 68px Inter, system-ui, sans-serif";
+      ctx.font = "800 66px Inter, system-ui, sans-serif";
       ctx.fillStyle = color;
-      const pctStr = `${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%`;
-      ctx.fillText(pctStr, PAD, y);
-      y += 52;
+      ctx.fillText(`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%`, PAD, y);
+      y += 50;
       ctx.font = "600 26px Inter, system-ui, sans-serif";
-      const amtStr = `${trade.pnl >= 0 ? "+" : ""}${fmtPrice(trade.pnl)} USD`;
-      ctx.fillText(amtStr, PAD, y);
-      y += 56;
+      ctx.fillText(`${trade.pnl >= 0 ? "+" : ""}${fmtPrice(trade.pnl)} USD`, PAD, y);
+      y += 54;
     }
 
     // ── position details ──
     if (showPosition) {
-      y += 10;
+      y += 8;
       const rows: Array<[string, string]> = [
         ["Entry Price", fmtPrice(trade.entryPrice)],
         [trade.closed ? "Exit Price" : "Current Price", fmtPrice(cur)],
@@ -158,10 +154,10 @@ export function ShareCard({ trade, onClose }: { trade: ShareTrade; onClose: () =
     }
 
     // ── footer ──
-    ctx.font = "500 15px Inter, system-ui, sans-serif";
+    ctx.font = "600 15px Inter, system-ui, sans-serif";
     ctx.fillStyle = MUTED;
-    ctx.fillText("charts.liquidityhunter.org", PAD, H - 40);
-  }, [showPnl, showPosition, showNickname, nickname, trade, color, cur, lev, pnlPct, side, up]);
+    ctx.fillText("www.liquidityhunter.org", PAD, H - 36);
+  }, [showPnl, showPosition, showNickname, nickname, trade, color, cur, lev, pnlPct, side, up, logo]);
 
   const download = () => {
     const c = canvasRef.current;
@@ -173,14 +169,8 @@ export function ShareCard({ trade, onClose }: { trade: ShareTrade; onClose: () =
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-2xl border border-neutral-800 bg-[#111] p-4"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl border border-neutral-800 bg-[#111] p-4" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <span className="text-sm font-semibold text-white">Share P/L</span>
           <button onClick={onClose} className="text-neutral-500 hover:text-white">
@@ -214,17 +204,8 @@ function Toggle({ label, on, set }: { label: string; on: boolean; set: (v: boole
       className="flex w-full items-center justify-between rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2.5 text-sm text-neutral-200"
     >
       <span>{label}</span>
-      <span
-        className={
-          "relative h-5 w-9 rounded-full transition " + (on ? "bg-emerald-500" : "bg-neutral-700")
-        }
-      >
-        <span
-          className={
-            "absolute top-0.5 h-4 w-4 rounded-full bg-white transition " +
-            (on ? "left-[18px]" : "left-0.5")
-          }
-        />
+      <span className={"relative h-5 w-9 rounded-full transition " + (on ? "bg-emerald-500" : "bg-neutral-700")}>
+        <span className={"absolute top-0.5 h-4 w-4 rounded-full bg-white transition " + (on ? "left-[18px]" : "left-0.5")} />
       </span>
     </button>
   );
@@ -238,4 +219,4 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
-        }
+}
