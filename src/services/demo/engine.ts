@@ -52,7 +52,7 @@ const lastPrice = new Map<string, number>();
 
 // ── Persistence ───────────────────────────────────────────────────────────
 
-function persist(): void {
+function writeLocal(): void {
   try {
     localStorage.setItem(
       storageKey(),
@@ -61,6 +61,27 @@ function persist(): void {
   } catch {
     /* storage full / unavailable — non-fatal */
   }
+}
+
+// Listeners notified after every change (used by cloud sync).
+const changeListeners = new Set<() => void>();
+export function onChange(cb: () => void): () => void {
+  changeListeners.add(cb);
+  return () => changeListeners.delete(cb);
+}
+function notifyChange(): void {
+  for (const cb of changeListeners) {
+    try {
+      cb();
+    } catch {
+      /* ignore listener errors */
+    }
+  }
+}
+
+function persist(): void {
+  writeLocal();
+  notifyChange();
 }
 
 function load(): boolean {
@@ -103,6 +124,32 @@ export function setUser(userId: string | null): void {
   account = makeAccount(DEFAULT_BALANCE);
   leverage = DEFAULT_LEVERAGE;
   initialized = load();
+}
+
+/** Serialize the full account state (for cloud sync). */
+export function getState(): {
+  account: Account;
+  leverage: number;
+  positions: Position[];
+  orders: Order[];
+  closed: ClosedPosition[];
+  fills: Fill[];
+} {
+  return { account, leverage, positions, orders, closed, fills };
+}
+
+/** Load a state blob (e.g. from the cloud) into the engine for a user. */
+export function hydrate(userId: string | null, state: ReturnType<typeof getState>): void {
+  currentUserId = userId ?? null;
+  account = state.account;
+  leverage = state.leverage ?? DEFAULT_LEVERAGE;
+  positions.splice(0, positions.length, ...(state.positions ?? []));
+  orders.splice(0, orders.length, ...(state.orders ?? []));
+  closed.splice(0, closed.length, ...(state.closed ?? []));
+  fills.splice(0, fills.length, ...(state.fills ?? []));
+  lastPrice.clear();
+  initialized = true;
+  writeLocal();
 }
 
 /** Create a fresh demo account with the chosen balance & leverage, and save it. */
