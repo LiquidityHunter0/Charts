@@ -6,14 +6,14 @@ import { Logo } from "./components/Logo.tsx";
 import { useAuthStore, useTradingStore } from "./services/store.tsx";
 import * as engine from "./services/demo/engine.ts";
 import { getUser, isAuthConfigured, verifySession } from "./services/supabaseAuth.ts";
+import * as cloud from "./services/cloudSync.ts";
 
 /**
  * Liquidity Hunter — trading terminal entry point.
  *
- * Flow: (1) login gate (shared LiquidityHunter/Supabase email+password).
- * (2) The engine is scoped to THIS user, so their funds/positions are isolated.
- * (3) First-time users pick a starting balance & leverage. (4) The account is
- * restored on every load.
+ * (1) Login gate (shared LiquidityHunter/Supabase). (2) The user's account is
+ * loaded from the CLOUD so it follows them across devices; falls back to this
+ * device's copy, else onboarding. (3) Every change syncs back to the cloud.
  */
 function Loading() {
   return (
@@ -56,7 +56,7 @@ export function App() {
     };
   }, []);
 
-  // 2) Boot the terminal once authenticated — scoped to this user's account.
+  // 2) Boot the terminal once authenticated — cloud account, scoped to user.
   useEffect(() => {
     if (!authed) return;
     let cancelled = false;
@@ -65,8 +65,19 @@ export function App() {
       localStorage.setItem("is_demo", "false");
       useAuthStore.setState({ isDemo: false });
 
-      // Isolate this user's funds / positions / history.
-      engine.setUser(getUser()?.id ?? null);
+      const uid = getUser()?.id ?? null;
+      engine.setUser(uid); // load this device's copy first (instant)
+
+      // Cloud is the source of truth across devices.
+      if (uid && cloud.isCloudEnabled()) {
+        const cloudState = await cloud.fetchState(uid);
+        if (cloudState?.account) {
+          engine.hydrate(uid, cloudState);
+        } else if (engine.isInitialized()) {
+          cloud.pushState(uid, engine.getState()); // migrate this device's account up
+        }
+        cloud.startAutoSync(uid); // keep cloud in sync on every change
+      }
 
       if (!engine.isInitialized()) {
         if (!cancelled) {
