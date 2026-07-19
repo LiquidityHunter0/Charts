@@ -141,15 +141,16 @@ export function ShareCard({ trade, onClose }: { trade: ShareTrade; onClose: () =
         ["Entry Price", fmtPrice(trade.entryPrice)],
         [trade.closed ? "Exit Price" : "Current Price", fmtPrice(cur)],
       ];
-      ctx.font = "500 18px Inter, system-ui, sans-serif";
       for (const [label, val] of rows) {
+        ctx.font = "500 21px Inter, system-ui, sans-serif";
         ctx.fillStyle = MUTED;
         ctx.fillText(label, PAD, y);
+        ctx.font = "700 26px Inter, system-ui, sans-serif";
         ctx.fillStyle = "#ffffff";
         ctx.textAlign = "right";
         ctx.fillText(val, W - PAD, y);
         ctx.textAlign = "left";
-        y += 38;
+        y += 48;
       }
     }
 
