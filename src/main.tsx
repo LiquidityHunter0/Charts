@@ -6,7 +6,16 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { App } from "./App.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { MarketDataBridge } from "./components/MarketDataBridge.tsx";
+import { applySessionHandoff } from "./services/supabaseAuth.ts";
 import "./styles/global.css";
+
+// ═════════════════════════════════════════════════════════════════
+// Seamless login handoff from the main LiquidityHunter app.
+// Must run before React mounts (App reads the session on first render),
+// so we call it here at the very top. If there are no handoff tokens in
+// the URL this is a cheap no-op and the normal login gate applies.
+// ═════════════════════════════════════════════════════════════════
+applySessionHandoff();
 
 const queryClient = new QueryClient({
   defaultOptions: {
