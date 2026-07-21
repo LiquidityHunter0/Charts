@@ -32,6 +32,48 @@ export function getUser(): AuthUser | null {
   return getSavedSession()?.user ?? null;
 }
 
+/**
+ * Seamless login handoff from the main LiquidityHunter app.
+ *
+ * The main app opens this terminal in a new tab with the shared Supabase
+ * session tokens in the URL hash:
+ *   https://charts.liquidityhunter.org/#access_token=...&refresh_token=...
+ *
+ * We decode the access token (a JWT — its payload holds the user id + email),
+ * save it as our session under the usual key, then strip the tokens out of the
+ * URL. The user lands already logged in, no password re-entry. On the next
+ * tick verifySession() validates the token against Supabase as usual, so a
+ * stale/forged token is still rejected.
+ *
+ * Must run BEFORE anything reads the session (see main.tsx). Synchronous.
+ */
+export function applySessionHandoff(): boolean {
+  try {
+    if (!location.hash) return false;
+    const h = new URLSearchParams(location.hash.slice(1));
+    const at = h.get("access_token");
+    const rt = h.get("refresh_token");
+    if (!at) return false;
+
+    // decode the JWT payload to recover { sub, email }
+    const payload = JSON.parse(
+      atob(at.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")),
+    );
+    const session: Session = {
+      access_token: at,
+      refresh_token: rt ?? undefined,
+      user: { id: payload.sub, email: payload.email },
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+
+    // remove the tokens from the URL so they don't linger in history
+    history.replaceState(null, "", location.pathname + location.search);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Sign in with email + password against Supabase Auth. */
 export async function signIn(
   email: string,
